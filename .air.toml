@@ -1,0 +1,10 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "powershell -File build.ps1"
+include_ext = ["go"]
+exclude_dir = ["tmp", "frontend"]
+
+[run]
+cmd = "./tmp/main.exe"
