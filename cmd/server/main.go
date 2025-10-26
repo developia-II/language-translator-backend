@@ -80,6 +80,11 @@ func main() {
 	admin.Get("/stats", handlers.GetAdminStats)
 	admin.Get("/feedbacks", handlers.GetAllFeedbacks)
 	admin.Get("/users", handlers.GetAllUsers)
+	// Metrics endpoints
+	admin.Get("/metrics/user-growth", handlers.GetUserGrowth)
+	admin.Get("/metrics/translation-volume", handlers.GetTranslationVolume)
+	admin.Get("/metrics/feedback-distribution", handlers.GetFeedbackDistribution)
+	admin.Get("/metrics/translation-by-language", handlers.GetTranslationByLanguage)
 
 	// Start server
 	port := os.Getenv("PORT")
