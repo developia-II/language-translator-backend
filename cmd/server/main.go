@@ -1,18 +1,18 @@
 package main
 
 import (
-    "log"
-    "os"
-    "time"
+	"log"
+	"os"
+	"time"
 
-    "github.com/developia-II/language-translator-backend/internal/database"
-    "github.com/developia-II/language-translator-backend/internal/handlers"
-    "github.com/gofiber/fiber/v2"
-    "github.com/gofiber/fiber/v2/middleware/cors"
-    "github.com/gofiber/fiber/v2/middleware/limiter"
-    "github.com/gofiber/fiber/v2/middleware/logger"
-    "github.com/gofiber/fiber/v2/middleware/recover"
-    "github.com/joho/godotenv"
+	"github.com/developia-II/language-translator-backend/internal/database"
+	"github.com/developia-II/language-translator-backend/internal/handlers"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -67,11 +67,27 @@ func main() {
 	api.Post("/feedback", handlers.SubmitFeedback)
 	api.Get("/feedback/:translationId", handlers.GetFeedback)
 
+	// Chat routes (protected)
+	api.Use(handlers.AuthMiddleware)
+	api.Post("/chat", handlers.Chat)
+	api.Get("/conversations", handlers.GetConversations)
+	api.Get("/conversations/:id", handlers.GetConversation)
+
+	// Admin routes (add admin middleware)
+	// admin := api.Group("/admin")
+	// admin.Use(handlers.AdminMiddleware) // You'll need to create this
+	// admin.Get("/stats", handlers.GetAdminStats)
+	// admin.Get("/feedbacks", handlers.GetAllFeedbacks)
+	// admin.Get("/users", handlers.GetAllUsers)
+
 	// Start server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+
+	log.Printf("GROQ_API_KEY present: %v", os.Getenv("GROQ_API_KEY") != "")
+	log.Printf("GROQ_MODEL: %s", os.Getenv("GROQ_MODEL"))
 
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(app.Listen(":" + port))

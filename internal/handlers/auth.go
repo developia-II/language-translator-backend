@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -78,6 +79,8 @@ func Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		// Log detailed parse error and raw body for debugging
 		log.Printf("Login BodyParser error: %v; raw body: %s", err, string(c.Body()))
+
+		fmt.Println("ERROR", err)
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
