@@ -52,6 +52,7 @@ func main() {
 	auth := api.Group("/auth")
 	auth.Post("/signup", handlers.Signup)
 	auth.Post("/login", handlers.Login)
+	auth.Get("/me", handlers.AuthMiddleware, handlers.Me)
 
 	// Protected routes
 	api.Use(handlers.AuthMiddleware)
@@ -73,12 +74,12 @@ func main() {
 	api.Get("/conversations", handlers.GetConversations)
 	api.Get("/conversations/:id", handlers.GetConversation)
 
-	// Admin routes (add admin middleware)
-	// admin := api.Group("/admin")
-	// admin.Use(handlers.AdminMiddleware) // You'll need to create this
-	// admin.Get("/stats", handlers.GetAdminStats)
-	// admin.Get("/feedbacks", handlers.GetAllFeedbacks)
-	// admin.Get("/users", handlers.GetAllUsers)
+	// Admin routes (protected by Auth + Admin middleware)
+	admin := api.Group("/admin")
+	admin.Use(handlers.AdminMiddleware)
+	admin.Get("/stats", handlers.GetAdminStats)
+	admin.Get("/feedbacks", handlers.GetAllFeedbacks)
+	admin.Get("/users", handlers.GetAllUsers)
 
 	// Start server
 	port := os.Getenv("PORT")

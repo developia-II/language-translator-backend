@@ -49,6 +49,7 @@ func Signup(c *fiber.Ctx) error {
 		Name:      req.Name,
 		Email:     req.Email,
 		Password:  string(hashedPassword),
+		Role:      "user",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -59,7 +60,7 @@ func Signup(c *fiber.Ctx) error {
 	}
 
 	// Generate JWT
-	token, err := utils.GenerateJWT(user.ID.Hex())
+	token, err := utils.GenerateJWT(user.ID.Hex(), user.Role)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to generate token")
 	}
@@ -69,6 +70,7 @@ func Signup(c *fiber.Ctx) error {
 			"id":    user.ID.Hex(),
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 		"token": token,
 	})
@@ -102,7 +104,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	// Generate JWT
-	token, err := utils.GenerateJWT(user.ID.Hex())
+	token, err := utils.GenerateJWT(user.ID.Hex(), user.Role)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to generate token")
 	}
@@ -112,6 +114,7 @@ func Login(c *fiber.Ctx) error {
 			"id":    user.ID.Hex(),
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 		"token": token,
 	})
@@ -135,6 +138,46 @@ func AuthMiddleware(c *fiber.Ctx) error {
 
 	claims := token.Claims.(jwt.MapClaims)
 	c.Locals("userId", claims["userId"].(string))
+	if role, ok := claims["role"].(string); ok {
+		c.Locals("role", role)
+	}
 
 	return c.Next()
+}
+
+// AdminMiddleware ensures the requester has role == "admin"
+func AdminMiddleware(c *fiber.Ctx) error {
+	role, _ := c.Locals("role").(string)
+	if role != "admin" {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "Admins only")
+	}
+	return c.Next()
+}
+
+// Me returns the authenticated user's profile
+func Me(c *fiber.Ctx) error {
+	userID, _ := c.Locals("userId").(string)
+	if userID == "" {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	oid, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Invalid user id")
+	}
+
+	collection := database.GetCollection("users")
+	var user models.User
+	if err := collection.FindOne(context.Background(), bson.M{"_id": oid}).Decode(&user); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "User not found")
+	}
+
+	return c.JSON(fiber.Map{
+		"user": fiber.Map{
+			"id":    user.ID.Hex(),
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
+	})
 }
