@@ -65,6 +65,7 @@ func GetTranslations(c *fiber.Ctx) error {
 	// Find all translations for user, sorted by most recent
 	opts := options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}).SetLimit(50)
 	cursor, err := collection.Find(context.Background(), bson.M{"userId": userObjID}, opts)
+
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch translations")
 	}

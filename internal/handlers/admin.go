@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/developia-II/language-translator-backend/internal/database"
-	"github.com/developia-II/language-translator-backend/internal/models"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -163,8 +162,8 @@ func GetAllFeedbacks(c *fiber.Ctx) error {
 		limit = 20
 	}
 
-	filter := bson.M{}
-	// Date range filter
+	// Build match filter
+	match := bson.M{}
 	if fromStr != "" || toStr != "" {
 		createdAt := bson.M{}
 		if fromStr != "" {
@@ -178,50 +177,83 @@ func GetAllFeedbacks(c *fiber.Ctx) error {
 			}
 		}
 		if len(createdAt) > 0 {
-			filter["createdAt"] = createdAt
+			match["createdAt"] = createdAt
 		}
 	}
 
-	// Total count
-	total, err := col.CountDocuments(ctx, filter)
+	// Total count with same match
+	total, err := col.CountDocuments(ctx, match)
 	if err != nil {
 		return utilsError(c)
 	}
 
-	// Pagination options
-	findOpts := options.Find().
-		SetSort(bson.M{"createdAt": -1}).
-		SetSkip(int64((page - 1) * limit)).
-		SetLimit(int64(limit))
+	// Aggregation pipeline: match, sort, skip/limit, lookups, project
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$sort": bson.M{"createdAt": -1}},
+		{"$skip": int64((page - 1) * limit)},
+		{"$limit": int64(limit)},
+		{"$lookup": bson.M{
+			"from": "users",
+			"localField": "userId",
+			"foreignField": "_id",
+			"as": "user",
+		}},
+		{"$unwind": bson.M{"path": "$user", "preserveNullAndEmptyArrays": true}},
+		{"$lookup": bson.M{
+			"from": "translations",
+			"localField": "translationId",
+			"foreignField": "_id",
+			"as": "translation",
+		}},
+		{"$unwind": bson.M{"path": "$translation", "preserveNullAndEmptyArrays": true}},
+		{"$project": bson.M{
+			"id":            "$_id",
+			"translationId": "$translationId",
+			"userId":        "$userId",
+			"rating":        "$rating",
+			"suggestedText": "$suggestedText",
+			"createdAt":     "$createdAt",
+			"userName":      bson.M{"$ifNull": []interface{}{"$user.name", ""}},
+			"sourceText":    bson.M{"$ifNull": []interface{}{"$translation.sourceText", ""}},
+			"translatedText": bson.M{"$ifNull": []interface{}{"$translation.translatedText", ""}},
+		}},
+	}
 
-	cursor, err := col.Find(ctx, filter, findOpts)
+	cur, err := col.Aggregate(ctx, pipeline)
 	if err != nil {
 		return utilsError(c)
 	}
-	defer cursor.Close(ctx)
+	defer cur.Close(ctx)
 
-	var docs []models.Feedback
-	if err := cursor.All(ctx, &docs); err != nil {
+	var rows []struct {
+		ID             primitive.ObjectID `bson:"id" json:"id"`
+		TranslationID  primitive.ObjectID `bson:"translationId" json:"translationId"`
+		UserID         primitive.ObjectID `bson:"userId" json:"userId"`
+		Rating         int                `bson:"rating" json:"rating"`
+		SuggestedText  string             `bson:"suggestedText" json:"suggestedText"`
+		CreatedAt      time.Time          `bson:"createdAt" json:"createdAt"`
+		UserName       string             `bson:"userName" json:"userName"`
+		SourceText     string             `bson:"sourceText" json:"sourceText"`
+		TranslatedText string             `bson:"translatedText" json:"translatedText"`
+	}
+	if err := cur.All(ctx, &rows); err != nil {
 		return utilsError(c)
 	}
 
-	// Serialize ObjectIDs to hex strings
-	feedbacks := make([]fiber.Map, 0, len(docs))
-	for _, f := range docs {
-		var tid, uid string
-		if f.TranslationID != primitive.NilObjectID {
-			tid = f.TranslationID.Hex()
-		}
-		if f.UserID != primitive.NilObjectID {
-			uid = f.UserID.Hex()
-		}
+	// Serialize ObjectIDs
+	feedbacks := make([]fiber.Map, 0, len(rows))
+	for _, r := range rows {
 		feedbacks = append(feedbacks, fiber.Map{
-			"id":            f.ID.Hex(),
-			"translationId": tid,
-			"userId":        uid,
-			"rating":        f.Rating,
-			"suggestedText": f.SuggestedText,
-			"createdAt":     f.CreatedAt,
+			"id":             r.ID.Hex(),
+			"translationId":  r.TranslationID.Hex(),
+			"userId":         r.UserID.Hex(),
+			"rating":         r.Rating,
+			"suggestedText":  r.SuggestedText,
+			"createdAt":      r.CreatedAt,
+			"userName":       r.UserName,
+			"sourceText":     r.SourceText,
+			"translatedText": r.TranslatedText,
 		})
 	}
 

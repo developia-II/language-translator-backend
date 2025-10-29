@@ -35,7 +35,7 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		CreatedAt:     time.Now(),
 	}
 
-	collection := database.GetCollection("feedback")
+	collection := database.GetCollection("feedbacks")
 	_, err := collection.InsertOne(context.Background(), feedback)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save feedback")
@@ -53,7 +53,7 @@ func GetFeedback(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Invalid translation ID")
 	}
 
-	collection := database.GetCollection("feedback")
+	collection := database.GetCollection("feedbacks")
 
 	var feedbacks []models.Feedback
 	cursor, err := collection.Find(context.Background(), bson.M{"translationId": translationObjID})

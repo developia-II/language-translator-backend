@@ -92,9 +92,6 @@ func main() {
 		port = "8080"
 	}
 
-	log.Printf("GROQ_API_KEY present: %v", os.Getenv("GROQ_API_KEY") != "")
-	log.Printf("GROQ_MODEL: %s", os.Getenv("GROQ_MODEL"))
-
 	log.Printf("Server starting on port %s", port)
 	log.Fatal(app.Listen(":" + port))
 }
